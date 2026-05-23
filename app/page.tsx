@@ -110,7 +110,7 @@ export default function IconicIntelligence() {
     const delayed = filteredTasks.filter(t => t.Derail_Days > 0).length;
     const critical = filteredTasks.filter(t => t.Is_Critical).length;
     const withProof = filteredTasks.filter(t => t.Has_Proof).length;
-    return { total, complete, delayed, critical, withProof, completeP ct: total ? Math.round((complete/total)*100) : 0 };
+    return { total, complete, delayed, critical, withProof, completePct: total ? Math.round((complete/total)*100) : 0 };
   }, [filteredTasks]);
 
   // BREADCRUMBS
