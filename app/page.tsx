@@ -472,8 +472,8 @@ function DashboardView({ data, filteredTasks, onTaskClick }: any) {
   }, [filteredTasks]);
 
   const phaseStats = useMemo(() => {
-    const phases = Array.from(new Set(filteredTasks.map((t: Task) => t.Phase))).filter(Boolean);
-    return phases.map(phase => {
+    const phases = Array.from(new Set(filteredTasks.map((t: Task) => t.Phase))).filter(Boolean) as string[];
+    return phases.map((phase: string) => {
       const phaseTasks = filteredTasks.filter((t: Task) => t.Phase === phase);
       const completed = phaseTasks.filter((t: Task) => t.Pct_Complete === 100).length;
       return {
