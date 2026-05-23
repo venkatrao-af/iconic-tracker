@@ -1,6 +1,7 @@
 {
-  "name": "iconic-tracker-ai",
-  "version": "3.0.0",
+  "name": "iconic-saas-platform",
+  "version": "4.0.0",
+  "description": "Professional SaaS Construction Intelligence Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",
