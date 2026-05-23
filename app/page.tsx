@@ -19,6 +19,7 @@ const DS = {
   },
   space: { 0: '0', 1: '4px', 2: '8px', 3: '12px', 4: '16px', 5: '20px', 6: '24px', 8: '32px', 10: '40px', 12: '48px' },
   radius: { sm: '4px', md: '6px', lg: '8px', xl: '12px' },
+  lineHeight: '1.5',
   color: {
     bg: '#F4F3EF', surface: '#FFFFFF', border: '#E2DDD5', borderL: 'rgba(226,221,213,0.3)',
     ink: '#1A1814', ink2: '#4A4540', ink3: '#8C8680', ink4: '#B8B2AA',
