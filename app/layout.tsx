@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Iconic Intelligence · Acres Foundation',
-  description: 'Enterprise Construction Portfolio Management',
+  title: 'Iconic Project Tracker',
+  description: 'Construction Portfolio Management Platform',
 }
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </head>
-      <body style={{ margin: 0, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif' }}>
+      <body style={{ margin: 0, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif', backgroundColor: '#FAFAFA' }}>
         {children}
       </body>
     </html>
