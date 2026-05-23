@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Iconic Project Tracker',
-  description: 'Construction Portfolio Management System',
+  description: 'Construction Portfolio Management Platform',
 }
 
 export default function RootLayout({
