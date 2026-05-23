@@ -179,7 +179,7 @@ export default function IconicIntelligence() {
               ].map(item => (
                 <button key={item.id} onClick={() => { setView(item.id as any); setSidebarOpen(false); }} style={{
                   padding: `${DS.space[3]} ${DS.space[4]}`, borderRadius: DS.radius.md, border: 'none', cursor: 'pointer', fontSize: DS.font.md, fontWeight: 600, textAlign: 'left', display: 'flex', gap: DS.space[3], alignItems: 'center', transition: 'all 0.15s',
-                  background: view === item.id ? DS.color.primaryLt : 'transparent',
+                  background: view === item.id ? DS.color.blueLt : 'transparent',
                   color: view === item.id ? DS.color.blue : DS.color.ink2
                 }}>
                   <span style={{ fontSize: DS.font.lg }}>{item.icon}</span>
@@ -224,7 +224,7 @@ export default function IconicIntelligence() {
             {(selectedProjects.length || selectedPhases.length || selectedOwners.length || searchQuery) && (
               <button onClick={clearFilters} style={{ padding: `${DS.space[1]} ${DS.space[3]}`, fontSize: DS.font.xs, fontWeight: 600, color: DS.color.blue, background: 'none', border: 'none', cursor: 'pointer' }}>Clear All</button>
             )}
-            <div style={{ marginLeft: 'auto', padding: `${DS.space[1]} ${DS.space[3]}`, borderRadius: '20px', background: DS.color.primaryLt, color: DS.color.blue, fontSize: DS.font.xs, fontWeight: 700 }}>
+            <div style={{ marginLeft: 'auto', padding: `${DS.space[1]} ${DS.space[3]}`, borderRadius: '20px', background: DS.color.blueLt, color: DS.color.blue, fontSize: DS.font.xs, fontWeight: 700 }}>
               {filteredTasks.length} Tasks
             </div>
           </div>
@@ -314,7 +314,7 @@ function OverviewView({ tasks, stats, projects, onTaskClick }: any) {
       {/* KPI CARDS - Rule of 6: 5 KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: DS.space[4] }}>
         {[
-          { label: 'Total Tasks', value: stats.total, color: DS.color.blue, bgColor: DS.color.primaryLt },
+          { label: 'Total Tasks', value: stats.total, color: DS.color.blue, bgColor: DS.color.blueLt },
           { label: 'Completed', value: stats.complete, color: DS.color.green, bgColor: DS.color.greenLt },
           { label: 'Delayed', value: stats.delayed, color: DS.color.red, bgColor: DS.color.redLt },
           { label: 'Critical Path', value: stats.critical, color: DS.color.amber, bgColor: DS.color.amberLt },
@@ -419,7 +419,7 @@ function WBSView({ tasks, expanded, onToggle, onTaskClick }: any) {
           <div style={{ color: DS.color.ink2 }}>{task.Owner}</div>
           <div style={{ fontSize: DS.font.xs, color: DS.color.ink3 }}>{task.Phase}</div>
           <div>
-            <span style={{ padding: `${DS.space[1]} ${DS.space[2]}`, borderRadius: '4px', fontSize: DS.font.xs, fontWeight: 600, background: task.Status === 'Complete' ? DS.color.greenLt : DS.color.primaryLt, color: task.Status === 'Complete' ? DS.color.green : DS.color.blue }}>
+            <span style={{ padding: `${DS.space[1]} ${DS.space[2]}`, borderRadius: '4px', fontSize: DS.font.xs, fontWeight: 600, background: task.Status === 'Complete' ? DS.color.greenLt : DS.color.blueLt, color: task.Status === 'Complete' ? DS.color.green : DS.color.blue }}>
               {task.Status}
             </span>
           </div>
@@ -518,7 +518,7 @@ function CalendarView({ tasks, onTaskClick }: any) {
               {dayTasks.slice(0, 2).map((t: Task) => (
                 <div key={t.id} onClick={() => onTaskClick(t)} style={{
                   fontSize: '9px', fontWeight: 700, padding: `${DS.space[1]} 2px`, marginBottom: DS.space[1], borderRadius: '3px',
-                  background: t.Is_Critical ? DS.color.redLt : DS.color.primaryLt,
+                  background: t.Is_Critical ? DS.color.redLt : DS.color.blueLt,
                   color: t.Is_Critical ? DS.color.red : DS.color.blue,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer'
                 }}>
