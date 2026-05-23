@@ -1,7 +1,7 @@
 {
-  "name": "iconic-complete-platform",
-  "version": "5.0.0",
-  "description": "Complete Professional SaaS Construction Platform",
+  "name": "iconic-professional-saas",
+  "version": "6.0.0",
+  "description": "Professional SaaS Construction Portfolio Management Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,8 +11,7 @@
   "dependencies": {
     "next": "latest",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@google/generative-ai": "^0.21.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
