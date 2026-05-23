@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Iconic Intelligence · Acres Foundation',
-  description: 'Professional Construction Portfolio Management Platform',
+  title: 'Iconic Project Tracker',
+  description: 'Construction Portfolio Management System',
 }
 
 export default function RootLayout({
