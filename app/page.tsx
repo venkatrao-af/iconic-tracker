@@ -315,9 +315,9 @@ function ErrorState({ error, onRetry }: { error: string, onRetry: () => void }) 
 function Sidebar({ open, onToggle, view, onViewChange, data, filters, onFiltersChange }: any) {
   if (!open) return null;
 
-  const phases = [...new Set(data.tasks.map((t: Task) => t.Phase).filter(Boolean))];
-  const owners = [...new Set(data.tasks.map((t: Task) => t.Owners).filter(Boolean))];
-  const statuses = [...new Set(data.tasks.map((t: Task) => t.Status).filter(Boolean))];
+const phases = Array.from(new Set(data.tasks.map((t: Task) => t.Phase).filter(Boolean)));
+const owners = Array.from(new Set(data.tasks.map((t: Task) => t.Owners).filter(Boolean)));
+const statuses = Array.from(new Set(data.tasks.map((t: Task) => t.Status).filter(Boolean)));
 
   return (
     <div style={{
