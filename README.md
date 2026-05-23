@@ -33,6 +33,7 @@ Done! App is live.
 - Calendar view
 - Task list with filters
 - AI insights
+- 
 
 ## Tech Stack
 - Next.js 15
