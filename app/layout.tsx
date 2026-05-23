@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Iconic Project Tracker',
-  description: 'Acres Foundation - Iconic Project Tracker',
+  title: 'Iconic Project Intelligence · Acres Foundation',
+  description: 'AI-Powered Construction Portfolio Management',
 }
 
 export default function RootLayout({
@@ -10,7 +10,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif' }}>
+      <body style={{ margin: 0, fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#0A0A0F' }}>
         {children}
       </body>
     </html>
