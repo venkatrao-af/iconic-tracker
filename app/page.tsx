@@ -47,6 +47,37 @@ type ProjectData = {
 };
 
 // ============================================================================
+// DEMO DATA - Replace with real data source later
+// ============================================================================
+const DEMO_DATA: ProjectData = {
+  projects: [
+    { id: 'CS', name: 'Chembur School Extension', color: '#1B4FD8' },
+    { id: 'IA', name: 'Iconic Avanta', color: '#16803C' },
+    { id: 'RT', name: 'Raya Terraces', color: '#B45309' },
+    { id: 'PW', name: 'Pawna', color: '#DC2626' },
+    { id: 'MS', name: 'Mulund School', color: '#0D7490' }
+  ],
+  tasks: [
+    { id: '1', WBS: '1', Task_Name: 'Chembur School Extension Project', Project: 'CS', Phase: 'Planning', Owner: 'Amey', Status: 'In Progress', Pct_Complete: 45, Planned_Start: '2026-01-01', Planned_Finish: '2027-06-30', Duration_Days: 546, Derail_Days: 0, Is_Critical: true, Outline_Level: 1, Is_Summary: true, Has_Proof: true },
+    { id: '2', WBS: '1.1', Task_Name: 'Site Survey & Analysis', Project: 'CS', Phase: 'Precon Design Works', Owner: 'Vipin', Status: 'Complete', Pct_Complete: 100, Planned_Start: '2026-01-01', Planned_Finish: '2026-01-30', Duration_Days: 30, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '1' },
+    { id: '3', WBS: '1.2', Task_Name: 'Feasibility Study', Project: 'CS', Phase: 'F1 - Feasibility & Concept', Owner: 'Ajay', Status: 'Complete', Pct_Complete: 100, Planned_Start: '2026-02-01', Planned_Finish: '2026-02-28', Duration_Days: 28, Derail_Days: 0, Is_Critical: false, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '1' },
+    { id: '4', WBS: '1.3', Task_Name: 'Preliminary Design', Project: 'CS', Phase: 'F2 - Preliminary Design', Owner: 'Suyesh', Status: 'In Progress', Pct_Complete: 60, Planned_Start: '2026-03-01', Planned_Finish: '2026-04-30', Duration_Days: 61, Derail_Days: 5, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '1' },
+    { id: '5', WBS: '1.4', Task_Name: 'Detailed Design', Project: 'CS', Phase: 'F3 - Detailed Design', Owner: 'Nikhil', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-05-01', Planned_Finish: '2026-07-31', Duration_Days: 92, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '1' },
+    { id: '6', WBS: '2', Task_Name: 'Iconic Avanta Tower', Project: 'IA', Phase: 'Structural Work', Owner: 'Irfan', Status: 'In Progress', Pct_Complete: 75, Planned_Start: '2025-06-01', Planned_Finish: '2026-12-31', Duration_Days: 579, Derail_Days: 15, Is_Critical: true, Outline_Level: 1, Is_Summary: true, Has_Proof: true },
+    { id: '7', WBS: '2.1', Task_Name: 'Foundation Work', Project: 'IA', Phase: 'E3 - Structural Work', Owner: 'Gazi', Status: 'Complete', Pct_Complete: 100, Planned_Start: '2025-06-01', Planned_Finish: '2025-09-30', Duration_Days: 122, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '2' },
+    { id: '8', WBS: '2.2', Task_Name: 'Superstructure Floors 1-10', Project: 'IA', Phase: 'E3 - Structural Work', Owner: 'Amey', Status: 'Complete', Pct_Complete: 100, Planned_Start: '2025-10-01', Planned_Finish: '2026-03-31', Duration_Days: 182, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '2' },
+    { id: '9', WBS: '2.3', Task_Name: 'Superstructure Floors 11-20', Project: 'IA', Phase: 'E3 - Structural Work', Owner: 'Vipin', Status: 'In Progress', Pct_Complete: 65, Planned_Start: '2026-04-01', Planned_Finish: '2026-09-30', Duration_Days: 183, Derail_Days: 12, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '2' },
+    { id: '10', WBS: '2.4', Task_Name: 'Roof & MEP Infrastructure', Project: 'IA', Phase: 'General', Owner: 'Ajay', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-10-01', Planned_Finish: '2026-12-31', Duration_Days: 92, Derail_Days: 0, Is_Critical: false, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '2' },
+    { id: '11', WBS: '3', Task_Name: 'Raya Terraces Development', Project: 'RT', Phase: 'Procurement', Owner: 'Suyesh', Status: 'In Progress', Pct_Complete: 30, Planned_Start: '2026-02-01', Planned_Finish: '2027-08-31', Duration_Days: 577, Derail_Days: 8, Is_Critical: true, Outline_Level: 1, Is_Summary: true, Has_Proof: false },
+    { id: '12', WBS: '3.1', Task_Name: 'Land Acquisition', Project: 'RT', Phase: 'CP1 - Procurement', Owner: 'Nikhil', Status: 'In Progress', Pct_Complete: 80, Planned_Start: '2026-02-01', Planned_Finish: '2026-05-31', Duration_Days: 120, Derail_Days: 10, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '3' },
+    { id: '13', WBS: '3.2', Task_Name: 'Permit Applications', Project: 'RT', Phase: 'T1 - Tender Stage', Owner: 'Irfan', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-06-01', Planned_Finish: '2026-08-31', Duration_Days: 92, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '3' },
+    { id: '14', WBS: '3.3', Task_Name: 'Initial Site Works', Project: 'RT', Phase: 'CP2 - Construction Phase', Owner: 'Gazi', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-09-01', Planned_Finish: '2027-01-31', Duration_Days: 153, Derail_Days: 0, Is_Critical: false, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '3' },
+    { id: '15', WBS: '4', Task_Name: 'Pawna Resort Complex', Project: 'PW', Phase: 'Design', Owner: 'Amey', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-07-01', Planned_Finish: '2027-12-31', Duration_Days: 549, Derail_Days: 0, Is_Critical: false, Outline_Level: 1, Is_Summary: true, Has_Proof: false },
+    { id: '16', WBS: '5', Task_Name: 'Mulund School Upgrades', Project: 'MS', Phase: 'Planning', Owner: 'Vipin', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-08-01', Planned_Finish: '2027-03-31', Duration_Days: 243, Derail_Days: 0, Is_Critical: false, Outline_Level: 1, Is_Summary: true, Has_Proof: false }
+  ]
+};
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 export default function IconicIntelligence() {
@@ -63,30 +94,13 @@ export default function IconicIntelligence() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [expandedWBS, setExpandedWBS] = useState<Set<string>>(new Set());
 
-  // DATA LOADING
+  // DATA LOADING - Using demo data for now
   useEffect(() => {
-    async function load() {
-      try {
-        const url = process.env.NEXT_PUBLIC_DRIVE_JSON_URL || '';
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Load failed');
-        const json = await res.json();
-        
-        // Enrich with computed fields
-        const tasks = json.tasks.map((t: any, idx: number) => ({
-          ...t,
-          Has_Proof: Math.random() > 0.3, // Simulate proof attachment
-          Outline_Level: t.WBS.split('.').length,
-          Is_Summary: t.WBS.split('.').length < 3,
-        }));
-        
-        setData({ projects: json.projects || [], tasks });
-        setLoading(false);
-      } catch (err) {
-        setLoading(false);
-      }
-    }
-    load();
+    // Simulate loading delay for realistic experience
+    setTimeout(() => {
+      setData(DEMO_DATA);
+      setLoading(false);
+    }, 800);
   }, []);
 
   // FILTERED TASKS (Cross-View Synchronized)
