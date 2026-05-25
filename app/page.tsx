@@ -1,402 +1,301 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useChat } from 'ai/react';
+import { format, parseISO, differenceInDays, addDays, startOfWeek } from 'date-fns';
 
-// ============================================================================
-// DESIGN SYSTEM - MATHEMATICAL FOUNDATIONS
-// Formula: Typography Scale = Base × 1.25
-// Formula: Spacing = Multiples of 4px
-// Formula: Corner Radius Inner = Outer - Padding  
-// Formula: Line Height = Font Size × 1.5
-// Formula: Touch Target = 44×44px minimum
-// Formula: Color Contrast = 4.5:1 minimum
-// ============================================================================
+// ═══════════════════════════════════════════════════════════════════════════
+// TYPE DEFINITIONS (From Google Sheets Schema)
+// ═══════════════════════════════════════════════════════════════════════════
 
-const DS = {
-  font: {
-    xs: '10px', sm: '12px', base: '13px', md: '14px', lg: '16px',
-    xl: '20px', '2xl': '24px', '3xl': '30px', heading: '36px'
-  },
-  space: { 0: '0', 1: '4px', 2: '8px', 3: '12px', 4: '16px', 5: '20px', 6: '24px', 8: '32px', 10: '40px', 12: '48px' },
-  radius: { sm: '4px', md: '6px', lg: '8px', xl: '12px' },
-  lineHeight: '1.5',
-  color: {
-    bg: '#F4F3EF', surface: '#FFFFFF', border: '#E2DDD5', borderL: 'rgba(226,221,213,0.3)',
-    ink: '#1A1814', ink2: '#4A4540', ink3: '#8C8680', ink4: '#B8B2AA',
-    blue: '#1B4FD8', blueLt: '#EEF2FF', green: '#16803C', greenLt: '#DCFCE7',
-    amber: '#B45309', amberLt: '#FEF3C7', red: '#DC2626', redLt: '#FEE2E2',
-    teal: '#0D7490', tealLt: '#E0F2FE', glass: 'rgba(255,255,255,0.45)'
-  },
-  shadow: { sm: '0 1px 4px rgba(0,0,0,0.06)', md: '0 4px 16px rgba(0,0,0,0.08)', lg: '0 8px 32px rgba(0,0,0,0.15)' },
-  glass: 'backdrop-filter: blur(25px); background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.25);'
-};
+interface Phase {
+  Phase_UID: string;
+  Phase_Name: string;
+  Project: string;
+  Project_Short: string;
+  Total_Tasks: number;
+  Leaf_Tasks: number;
+  Pct_Complete: number;
+  Status: string;
+  Health: 'On Track' | 'At Risk' | 'Critical';
+  Overdue_Tasks: number;
+  Critical_Tasks: number;
+  At_Risk_Tasks: number;
+  Owners: string;
+  Planned_Start: string;
+  Planned_Finish: string;
+}
 
-// ============================================================================
-// TYPES
-// ============================================================================
-type Task = {
-  id: string; WBS: string; Task_Name: string; Project: string; Phase: string; Owner: string;
-  Status: 'Not Started' | 'In Progress' | 'Complete' | 'On Hold'; Pct_Complete: number;
-  Planned_Start: string; Planned_Finish: string; Duration_Days: number; Derail_Days: number;
-  Is_Critical: boolean; Outline_Level: number; Is_Summary: boolean; Parent_WBS?: string; Has_Proof: boolean;
-};
+interface Resource {
+  Owner_Name: string;
+  Active_Tasks: number;
+  Overdue_Tasks: number;
+  Critical_Tasks: number;
+  Concurrent_Tasks: number;
+  Peak_Load_Date: string;
+  Peak_Load_Count: number;
+  Utilization_Pct: number;
+  Burnout_Risk: 'Low' | 'Medium' | 'High';
+  Projects: string;
+}
 
-type ProjectData = {
-  projects: Array<{ id: string; name: string; color: string }>;
+interface HeatmapWeek {
+  Week_Starting: string;
+  Week_Ending: string;
+  Tasks_Due: number;
+  Critical_Due: number;
+  Milestones_Due: number;
+  Overdue_Carryover: number;
+  Total_Pressure: number;
+  Risk_Level: string;
+  Top_Projects: string;
+}
+
+interface Task {
+  Task_UID: string;
+  Project: string;
+  Project_Short: string;
+  Task_Name: string;
+  Phase: string;
+  Owners: string;
+  Status: string;
+  Health: string;
+  Pct_Complete: number;
+  Planned_Start: string;
+  Planned_Finish: string;
+  Is_Critical: string;
+  Derail_Days: number;
+  Action_Required: string;
+}
+
+interface Project {
+  Project_UID: string;
+  Project_Name: string;
+  Project_Short: string;
+  Color: string;
+  Status: string;
+  Health: string;
+  Pct_Complete: number;
+  Total_Tasks: number;
+  Critical_Tasks: number;
+  Overdue_Tasks: number;
+  Milestones_Count: number;
+}
+
+interface BootstrapData {
+  phases: Phase[];
+  resources: Resource[];
+  heatmap: HeatmapWeek[];
   tasks: Task[];
+  projects: Project[];
+  critical_path: Task[];
+  milestones: Task[];
+  metadata: { last_sync: string };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const healthColors = {
+  'On Track': '#10B981',
+  'At Risk': '#F59E0B',
+  'Critical': '#EF4444',
 };
 
-// ============================================================================
-// DEMO DATA - Replace with real data source later
-// ============================================================================
-const DEMO_DATA: ProjectData = {
-  projects: [
-    { id: 'CS', name: 'Chembur School Extension', color: '#1B4FD8' },
-    { id: 'IA', name: 'Iconic Avanta', color: '#16803C' },
-    { id: 'RT', name: 'Raya Terraces', color: '#B45309' },
-    { id: 'PW', name: 'Pawna', color: '#DC2626' },
-    { id: 'MS', name: 'Mulund School', color: '#0D7490' }
-  ],
-  tasks: [
-    { id: '1', WBS: '1', Task_Name: 'Chembur School Extension Project', Project: 'CS', Phase: 'Planning', Owner: 'Amey', Status: 'In Progress', Pct_Complete: 45, Planned_Start: '2026-01-01', Planned_Finish: '2027-06-30', Duration_Days: 546, Derail_Days: 0, Is_Critical: true, Outline_Level: 1, Is_Summary: true, Has_Proof: true },
-    { id: '2', WBS: '1.1', Task_Name: 'Site Survey & Analysis', Project: 'CS', Phase: 'Precon Design Works', Owner: 'Vipin', Status: 'Complete', Pct_Complete: 100, Planned_Start: '2026-01-01', Planned_Finish: '2026-01-30', Duration_Days: 30, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '1' },
-    { id: '3', WBS: '1.2', Task_Name: 'Feasibility Study', Project: 'CS', Phase: 'F1 - Feasibility & Concept', Owner: 'Ajay', Status: 'Complete', Pct_Complete: 100, Planned_Start: '2026-02-01', Planned_Finish: '2026-02-28', Duration_Days: 28, Derail_Days: 0, Is_Critical: false, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '1' },
-    { id: '4', WBS: '1.3', Task_Name: 'Preliminary Design', Project: 'CS', Phase: 'F2 - Preliminary Design', Owner: 'Suyesh', Status: 'In Progress', Pct_Complete: 60, Planned_Start: '2026-03-01', Planned_Finish: '2026-04-30', Duration_Days: 61, Derail_Days: 5, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '1' },
-    { id: '5', WBS: '1.4', Task_Name: 'Detailed Design', Project: 'CS', Phase: 'F3 - Detailed Design', Owner: 'Nikhil', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-05-01', Planned_Finish: '2026-07-31', Duration_Days: 92, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '1' },
-    { id: '6', WBS: '2', Task_Name: 'Iconic Avanta Tower', Project: 'IA', Phase: 'Structural Work', Owner: 'Irfan', Status: 'In Progress', Pct_Complete: 75, Planned_Start: '2025-06-01', Planned_Finish: '2026-12-31', Duration_Days: 579, Derail_Days: 15, Is_Critical: true, Outline_Level: 1, Is_Summary: true, Has_Proof: true },
-    { id: '7', WBS: '2.1', Task_Name: 'Foundation Work', Project: 'IA', Phase: 'E3 - Structural Work', Owner: 'Gazi', Status: 'Complete', Pct_Complete: 100, Planned_Start: '2025-06-01', Planned_Finish: '2025-09-30', Duration_Days: 122, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '2' },
-    { id: '8', WBS: '2.2', Task_Name: 'Superstructure Floors 1-10', Project: 'IA', Phase: 'E3 - Structural Work', Owner: 'Amey', Status: 'Complete', Pct_Complete: 100, Planned_Start: '2025-10-01', Planned_Finish: '2026-03-31', Duration_Days: 182, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '2' },
-    { id: '9', WBS: '2.3', Task_Name: 'Superstructure Floors 11-20', Project: 'IA', Phase: 'E3 - Structural Work', Owner: 'Vipin', Status: 'In Progress', Pct_Complete: 65, Planned_Start: '2026-04-01', Planned_Finish: '2026-09-30', Duration_Days: 183, Derail_Days: 12, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '2' },
-    { id: '10', WBS: '2.4', Task_Name: 'Roof & MEP Infrastructure', Project: 'IA', Phase: 'General', Owner: 'Ajay', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-10-01', Planned_Finish: '2026-12-31', Duration_Days: 92, Derail_Days: 0, Is_Critical: false, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '2' },
-    { id: '11', WBS: '3', Task_Name: 'Raya Terraces Development', Project: 'RT', Phase: 'Procurement', Owner: 'Suyesh', Status: 'In Progress', Pct_Complete: 30, Planned_Start: '2026-02-01', Planned_Finish: '2027-08-31', Duration_Days: 577, Derail_Days: 8, Is_Critical: true, Outline_Level: 1, Is_Summary: true, Has_Proof: false },
-    { id: '12', WBS: '3.1', Task_Name: 'Land Acquisition', Project: 'RT', Phase: 'CP1 - Procurement', Owner: 'Nikhil', Status: 'In Progress', Pct_Complete: 80, Planned_Start: '2026-02-01', Planned_Finish: '2026-05-31', Duration_Days: 120, Derail_Days: 10, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: true, Parent_WBS: '3' },
-    { id: '13', WBS: '3.2', Task_Name: 'Permit Applications', Project: 'RT', Phase: 'T1 - Tender Stage', Owner: 'Irfan', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-06-01', Planned_Finish: '2026-08-31', Duration_Days: 92, Derail_Days: 0, Is_Critical: true, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '3' },
-    { id: '14', WBS: '3.3', Task_Name: 'Initial Site Works', Project: 'RT', Phase: 'CP2 - Construction Phase', Owner: 'Gazi', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-09-01', Planned_Finish: '2027-01-31', Duration_Days: 153, Derail_Days: 0, Is_Critical: false, Outline_Level: 2, Is_Summary: false, Has_Proof: false, Parent_WBS: '3' },
-    { id: '15', WBS: '4', Task_Name: 'Pawna Resort Complex', Project: 'PW', Phase: 'Design', Owner: 'Amey', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-07-01', Planned_Finish: '2027-12-31', Duration_Days: 549, Derail_Days: 0, Is_Critical: false, Outline_Level: 1, Is_Summary: true, Has_Proof: false },
-    { id: '16', WBS: '5', Task_Name: 'Mulund School Upgrades', Project: 'MS', Phase: 'Planning', Owner: 'Vipin', Status: 'Not Started', Pct_Complete: 0, Planned_Start: '2026-08-01', Planned_Finish: '2027-03-31', Duration_Days: 243, Derail_Days: 0, Is_Critical: false, Outline_Level: 1, Is_Summary: true, Has_Proof: false }
-  ]
+const healthBgColors = {
+  'On Track': 'rgba(16, 185, 129, 0.1)',
+  'At Risk': 'rgba(245, 158, 11, 0.1)',
+  'Critical': 'rgba(239, 68, 68, 0.1)',
 };
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-export default function IconicIntelligence() {
-  // STATE
-  const [data, setData] = useState<ProjectData | null>(null);
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN DASHBOARD COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+export default function IconicDashboard() {
+  const [data, setData] = useState<BootstrapData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'overview' | 'wbs' | 'timeline' | 'calendar'>('overview');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
-  const [selectedPhases, setSelectedPhases] = useState<string[]>([]);
-  const [selectedOwners, setSelectedOwners] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [expandedWBS, setExpandedWBS] = useState<Set<string>>(new Set());
+  const [activeView, setActiveView] = useState<'executive' | 'projects' | 'schedule' | 'resources' | 'ai'>('executive');
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
 
-  // DATA LOADING - Using demo data for now
+  // Load data from API
   useEffect(() => {
-    // Simulate loading delay for realistic experience
-    setTimeout(() => {
-      setData(DEMO_DATA);
-      setLoading(false);
-    }, 800);
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/api/bootstrap');
+        const json = await response.json();
+        setData(json);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
-  // FILTERED TASKS (Cross-View Synchronized)
-  const filteredTasks = useMemo(() => {
-    if (!data) return [];
-    return data.tasks.filter(t => {
-      if (selectedProjects.length && !selectedProjects.includes(t.Project)) return false;
-      if (selectedPhases.length && !selectedPhases.includes(t.Phase)) return false;
-      if (selectedOwners.length && !selectedOwners.includes(t.Owner)) return false;
-      if (searchQuery && !t.Task_Name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      return true;
-    });
-  }, [data, selectedProjects, selectedPhases, selectedOwners, searchQuery]);
+  // Filter data by selected project
+  const filteredData = useMemo(() => {
+    if (!data || !selectedProject) return data;
+    return {
+      ...data,
+      phases: data.phases.filter(p => p.Project_Short === selectedProject),
+      tasks: data.tasks.filter(t => t.Project_Short === selectedProject),
+      critical_path: data.critical_path.filter(t => t.Project_Short === selectedProject),
+    };
+  }, [data, selectedProject]);
 
-  // COMPUTED METADATA
-  const phases = useMemo(() => data ? Array.from(new Set(data.tasks.map(t => t.Phase))).sort() : [], [data]);
-  const owners = useMemo(() => data ? Array.from(new Set(data.tasks.map(t => t.Owner))).sort() : [], [data]);
-  
-  const stats = useMemo(() => {
-    const total = filteredTasks.length;
-    const complete = filteredTasks.filter(t => t.Status === 'Complete').length;
-    const delayed = filteredTasks.filter(t => t.Derail_Days > 0).length;
-    const critical = filteredTasks.filter(t => t.Is_Critical).length;
-    const withProof = filteredTasks.filter(t => t.Has_Proof).length;
-    return { total, complete, delayed, critical, withProof, completePct: total ? Math.round((complete/total)*100) : 0 };
-  }, [filteredTasks]);
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-white text-xl">Loading Iconic Tracker...</div>
+      </div>
+    );
+  }
 
-  // BREADCRUMBS
-  const breadcrumb = useMemo(() => {
-    const parts = ['Home', view.charAt(0).toUpperCase() + view.slice(1)];
-    const filters = [];
-    if (selectedProjects.length) filters.push(`${selectedProjects.length} Project${selectedProjects.length > 1 ? 's' : ''}`);
-    if (selectedPhases.length) filters.push(`${selectedPhases.length} Phase${selectedPhases.length > 1 ? 's' : ''}`);
-    if (selectedOwners.length) filters.push(`${selectedOwners.length} Owner${selectedOwners.length > 1 ? 's' : ''}`);
-    if (searchQuery) filters.push(`"${searchQuery}"`);
-    if (filters.length) parts.push(filters.join(' · '));
-    return parts.join(' › ');
-  }, [view, selectedProjects, selectedPhases, selectedOwners, searchQuery]);
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-red-400 text-xl">Failed to load data</div>
+      </div>
+    );
+  }
 
-  // HANDLERS
-  const toggleProject = (proj: string) => {
-    setSelectedProjects(prev => prev.includes(proj) ? prev.filter(p => p !== proj) : [...prev, proj]);
-  };
-  
-  const clearFilters = () => {
-    setSelectedProjects([]); setSelectedPhases([]); setSelectedOwners([]); setSearchQuery('');
-  };
-  
-  const openDrawer = (task: Task) => {
-    setSelectedTask(task); setDrawerOpen(true);
-  };
-  
-  const toggleWBS = (wbs: string) => {
-    setExpandedWBS(prev => {
-      const next = new Set(prev);
-      next.has(wbs) ? next.delete(wbs) : next.add(wbs);
-      return next;
-    });
-  };
-
-  if (loading) return <LoadingState />;
-  if (!data) return <ErrorState />;
+  const displayData = filteredData || data;
 
   return (
-    <div style={{ minHeight: '100vh', background: DS.color.bg, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: DS.font.base, color: DS.color.ink, lineHeight: DS.lineHeight }}>
-      
-      {/* HAMBURGER MENU */}
-      <button onClick={() => setSidebarOpen(true)} style={{ position: 'fixed', top: DS.space[4], left: DS.space[4], zIndex: 30, width: DS.space[10], height: DS.space[10], borderRadius: DS.radius.md, border: `1px solid ${DS.color.borderL}`, background: DS.color.glass, backdropFilter: 'blur(25px)', boxShadow: DS.shadow.md, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Menu">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke={DS.color.ink} strokeWidth="2" strokeLinecap="round"/></svg>
-      </button>
+    <div className="min-h-screen bg-slate-950 text-white">
+      {/* Header */}
+      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-teal-400">Iconic Project Tracker</h1>
+              <p className="text-sm text-slate-400">
+                Last synced: {format(parseISO(data.metadata.last_sync), 'PPpp')}
+              </p>
+            </div>
+            <button
+              onClick={() => setAiOpen(!aiOpen)}
+              className="px-4 py-2 bg-teal-500 hover:bg-teal-600 rounded-lg transition-colors"
+            >
+              🤖 AI Assistant
+            </button>
+          </div>
 
-      {/* FLOATING SIDEBAR */}
-      {sidebarOpen && (
-        <>
-          <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)', zIndex: 40 }} />
-          <aside style={{ position: 'fixed', left: 0, top: 0, bottom: 0, width: '280px', background: DS.color.surface, boxShadow: DS.shadow.lg, zIndex: 50, display: 'flex', flexDirection: 'column', padding: DS.space[5] }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: DS.space[6], borderBottom: `1px solid ${DS.color.border}`, paddingBottom: DS.space[4] }}>
-              <h2 style={{ margin: 0, fontFamily: "'Fraunces', serif", fontSize: DS.font['2xl'], fontWeight: 700 }}>Iconic<span style={{ fontWeight: 300 }}>Intelligence</span></h2>
-              <button onClick={() => setSidebarOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: DS.space[2], borderRadius: DS.radius.sm }}>
-                <svg width="20" height="20" viewBox="0 0 20 20"><path d="M6 6l8 8M14 6l-8 8" stroke={DS.color.ink3} strokeWidth="2" strokeLinecap="round"/></svg>
+          {/* View Tabs */}
+          <nav className="flex gap-2 mt-4 overflow-x-auto">
+            {[
+              { id: 'executive', label: '📊 Executive', icon: '📊' },
+              { id: 'projects', label: '🏗️ Projects', icon: '🏗️' },
+              { id: 'schedule', label: '📈 Schedule', icon: '📈' },
+              { id: 'resources', label: '👥 Resources', icon: '👥' },
+            ].map((view) => (
+              <button
+                key={view.id}
+                onClick={() => setActiveView(view.id as any)}
+                className={`px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
+                  activeView === view.id
+                    ? 'bg-teal-500 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                {view.label}
               </button>
-            </div>
-            
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: DS.space[2] }}>
-              {[
-                { id: 'overview', label: 'Executive Overview', icon: '📊' },
-                { id: 'wbs', label: 'WBS Breakdown', icon: '🗂️' },
-                { id: 'timeline', label: 'Gantt Timeline', icon: '📅' },
-                { id: 'calendar', label: 'Calendar View', icon: '📆' }
-              ].map(item => (
-                <button key={item.id} onClick={() => { setView(item.id as any); setSidebarOpen(false); }} style={{
-                  padding: `${DS.space[3]} ${DS.space[4]}`, borderRadius: DS.radius.md, border: 'none', cursor: 'pointer', fontSize: DS.font.md, fontWeight: 600, textAlign: 'left', display: 'flex', gap: DS.space[3], alignItems: 'center', transition: 'all 0.15s',
-                  background: view === item.id ? DS.color.blueLt : 'transparent',
-                  color: view === item.id ? DS.color.blue : DS.color.ink2
-                }}>
-                  <span style={{ fontSize: DS.font.lg }}>{item.icon}</span>
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-            
-            <div style={{ marginTop: 'auto', paddingTop: DS.space[6], borderTop: `1px solid ${DS.color.border}`, fontSize: DS.font.xs, color: DS.color.ink4 }}>
-              Acres Foundation v2.0
-            </div>
-          </aside>
-        </>
-      )}
+            ))}
+          </nav>
 
-      {/* MAIN CONTENT */}
-      <div style={{ paddingLeft: DS.space[16] }}>
-        
-        {/* TOP BAR: PROJECT TABS */}
-        <div style={{ position: 'sticky', top: 0, zIndex: 20, background: `${DS.color.glass}`, backdropFilter: 'blur(25px)', borderBottom: `1px solid ${DS.color.borderL}`, boxShadow: DS.shadow.sm }}>
-          <div style={{ padding: `${DS.space[3]} ${DS.space[5]}`, display: 'flex', gap: DS.space[2], overflowX: 'auto' }}>
-            <button onClick={() => setSelectedProjects([])} style={{
-              padding: `${DS.space[2]} ${DS.space[4]}`, borderRadius: '20px', border: `1.5px solid ${DS.color.border}`, background: selectedProjects.length === 0 ? DS.color.blue : DS.color.surface, color: selectedProjects.length === 0 ? '#fff' : DS.color.ink2, fontSize: DS.font.sm, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s'
-            }}>All Projects</button>
-            {data.projects.map(proj => (
-              <button key={proj.id} onClick={() => toggleProject(proj.id)} style={{
-                padding: `${DS.space[2]} ${DS.space[4]}`, borderRadius: '20px', border: `1.5px solid ${selectedProjects.includes(proj.id) ? proj.color : DS.color.border}`, background: selectedProjects.includes(proj.id) ? proj.color : DS.color.surface, color: selectedProjects.includes(proj.id) ? '#fff' : DS.color.ink2, fontSize: DS.font.sm, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s'
-              }}>{proj.name}</button>
+          {/* Project Filter Chips */}
+          <div className="flex gap-2 mt-3 flex-wrap">
+            <button
+              onClick={() => setSelectedProject(null)}
+              className={`px-3 py-1 rounded-full text-sm transition-all ${
+                !selectedProject
+                  ? 'bg-teal-500 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              All Projects
+            </button>
+            {data.projects.map((project) => (
+              <button
+                key={project.Project_Short}
+                onClick={() => setSelectedProject(project.Project_Short)}
+                className={`px-3 py-1 rounded-full text-sm transition-all ${
+                  selectedProject === project.Project_Short
+                    ? 'text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+                style={{
+                  backgroundColor: selectedProject === project.Project_Short ? project.Color : undefined,
+                }}
+              >
+                {project.Project_Short}
+              </button>
             ))}
           </div>
-          
-          {/* FILTER BAR */}
-          <div style={{ padding: `${DS.space[2]} ${DS.space[5]}`, borderTop: `1px solid ${DS.color.borderL}`, display: 'flex', gap: DS.space[3], alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Filters:</span>
-            <select multiple value={selectedPhases} onChange={e => setSelectedPhases(Array.from(e.target.selectedOptions, o => o.value))} style={{ padding: `${DS.space[1]} ${DS.space[2]}`, fontSize: DS.font.sm, borderRadius: DS.radius.sm, border: `1px solid ${DS.color.border}`, background: DS.color.surface, minHeight: '32px' }}>
-              {phases.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select multiple value={selectedOwners} onChange={e => setSelectedOwners(Array.from(e.target.selectedOptions, o => o.value))} style={{ padding: `${DS.space[1]} ${DS.space[2]}`, fontSize: DS.font.sm, borderRadius: DS.radius.sm, border: `1px solid ${DS.color.border}`, background: DS.color.surface, minHeight: '32px' }}>
-              {owners.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-            <input type="text" placeholder="Search tasks..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ padding: `${DS.space[2]} ${DS.space[3]}`, fontSize: DS.font.sm, borderRadius: DS.radius.sm, border: `1px solid ${DS.color.border}`, background: DS.color.surface, minWidth: '200px' }} />
-            {(selectedProjects.length || selectedPhases.length || selectedOwners.length || searchQuery) && (
-              <button onClick={clearFilters} style={{ padding: `${DS.space[1]} ${DS.space[3]}`, fontSize: DS.font.xs, fontWeight: 600, color: DS.color.blue, background: 'none', border: 'none', cursor: 'pointer' }}>Clear All</button>
-            )}
-            <div style={{ marginLeft: 'auto', padding: `${DS.space[1]} ${DS.space[3]}`, borderRadius: '20px', background: DS.color.blueLt, color: DS.color.blue, fontSize: DS.font.xs, fontWeight: 700 }}>
-              {filteredTasks.length} Tasks
-            </div>
-          </div>
         </div>
+      </header>
 
-        {/* BREADCRUMBS */}
-        <div style={{ padding: `${DS.space[3]} ${DS.space[5]}`, fontSize: DS.font.xs, color: DS.color.ink3, display: 'flex', alignItems: 'center', gap: DS.space[2] }}>
-          {breadcrumb.split(' › ').map((part, i, arr) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: DS.space[2] }}>
-              <span style={{ color: i === arr.length - 1 ? DS.color.blue : DS.color.ink3, fontWeight: i === arr.length - 1 ? 600 : 400 }}>{part}</span>
-              {i < arr.length - 1 && <span>›</span>}
-            </span>
-          ))}
-        </div>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6">
+        {activeView === 'executive' && <ExecutiveView data={displayData} />}
+        {activeView === 'projects' && <ProjectsView data={displayData} />}
+        {activeView === 'schedule' && <ScheduleView data={displayData} />}
+        {activeView === 'resources' && <ResourcesView data={displayData} />}
+      </main>
 
-        {/* DYNAMIC VIEWS */}
-        <div style={{ padding: DS.space[5] }}>
-          {view === 'overview' && <OverviewView tasks={filteredTasks} stats={stats} projects={data.projects} onTaskClick={openDrawer} />}
-          {view === 'wbs' && <WBSView tasks={filteredTasks} expanded={expandedWBS} onToggle={toggleWBS} onTaskClick={openDrawer} />}
-          {view === 'timeline' && <TimelineView tasks={filteredTasks} onTaskClick={openDrawer} />}
-          {view === 'calendar' && <CalendarView tasks={filteredTasks} onTaskClick={openDrawer} />}
-        </div>
-      </div>
-
-      {/* TASK DETAIL DRAWER */}
-      {drawerOpen && selectedTask && (
-        <>
-          <div onClick={() => setDrawerOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)', zIndex: 60 }} />
-          <aside style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '450px', background: DS.color.surface, boxShadow: DS.shadow.lg, zIndex: 70, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: DS.space[6] }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: DS.space[5] }}>
-              <div>
-                <div style={{ fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>WBS {selectedTask.WBS}</div>
-                <h3 style={{ margin: `${DS.space[2]} 0 0 0`, fontFamily: "'Fraunces', serif", fontSize: DS.font.xl, fontWeight: 700, lineHeight: 1.3 }}>{selectedTask.Task_Name}</h3>
-              </div>
-              <button onClick={() => setDrawerOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: DS.space[1] }}>
-                <svg width="20" height="20"><path d="M6 6l8 8M14 6l-8 8" stroke={DS.color.ink3} strokeWidth="2" strokeLinecap="round"/></svg>
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: DS.space[4], fontSize: DS.font.sm }}>
-              <div><div style={{ fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, marginBottom: DS.space[1] }}>Status</div><div style={{ fontWeight: 600 }}>{selectedTask.Status}</div></div>
-              <div><div style={{ fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, marginBottom: DS.space[1] }}>Progress</div><div style={{ fontWeight: 600 }}>{selectedTask.Pct_Complete}%</div></div>
-              <div><div style={{ fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, marginBottom: DS.space[1] }}>Owner</div><div>{selectedTask.Owner}</div></div>
-              <div><div style={{ fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, marginBottom: DS.space[1] }}>Phase</div><div>{selectedTask.Phase}</div></div>
-              <div><div style={{ fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, marginBottom: DS.space[1] }}>Start</div><div>{selectedTask.Planned_Start}</div></div>
-              <div><div style={{ fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, marginBottom: DS.space[1] }}>Finish</div><div>{selectedTask.Planned_Finish}</div></div>
-            </div>
-
-            <div style={{ marginTop: DS.space[5], padding: DS.space[4], borderRadius: DS.radius.lg, border: `1px solid ${DS.color.border}`, background: selectedTask.Has_Proof ? DS.color.greenLt : DS.color.amberLt }}>
-              <div style={{ fontSize: DS.font.xs, fontWeight: 700, color: selectedTask.Has_Proof ? DS.color.green : DS.color.amber, textTransform: 'uppercase', marginBottom: DS.space[2] }}>Proof of Completion</div>
-              <div style={{ fontSize: DS.font.sm, color: DS.color.ink2 }}>
-                {selectedTask.Has_Proof ? '✓ Document attached (task ready for completion)' : '⚠ No proof attached (required before marking complete)'}
-              </div>
-            </div>
-          </aside>
-        </>
+      {/* AI Chat Panel */}
+      {aiOpen && (
+        <AIChatPanel
+          data={displayData}
+          onClose={() => setAiOpen(false)}
+          onFilterChange={setSelectedProject}
+        />
       )}
     </div>
   );
 }
 
-// ============================================================================
+// ═══════════════════════════════════════════════════════════════════════════
 // VIEW COMPONENTS
-// ============================================================================
+// ═══════════════════════════════════════════════════════════════════════════
 
-function OverviewView({ tasks, stats, projects, onTaskClick }: any) {
-  const phaseData = useMemo(() => {
-    const map = new Map();
-    tasks.forEach((t: Task) => {
-      if (!map.has(t.Phase)) map.set(t.Phase, { total: 0, complete: 0 });
-      const d = map.get(t.Phase);
-      d.total++; if (t.Status === 'Complete') d.complete++;
-    });
-    return Array.from(map.entries()).map(([phase, d]) => ({ phase, pct: d.total ? Math.round((d.complete/d.total)*100) : 0, ...d }));
-  }, [tasks]);
-
-  const projectData = useMemo(() => {
-    return projects.map((p: any) => {
-      const pTasks = tasks.filter((t: Task) => t.Project === p.id);
-      const complete = pTasks.filter((t: Task) => t.Status === 'Complete').length;
-      return { ...p, total: pTasks.length, complete, pct: pTasks.length ? Math.round((complete/pTasks.length)*100) : 0 };
-    });
-  }, [tasks, projects]);
+function ExecutiveView({ data }: { data: BootstrapData }) {
+  const portfolioComplete = Math.round(
+    data.tasks.reduce((sum, t) => sum + t.Pct_Complete, 0) / data.tasks.length
+  );
+  const totalCritical = data.critical_path.length;
+  const totalOverdue = data.tasks.filter(t => t.Derail_Days > 0).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: DS.space[6] }}>
-      {/* KPI CARDS - Rule of 6: 5 KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: DS.space[4] }}>
-        {[
-          { label: 'Total Tasks', value: stats.total, color: DS.color.blue, bgColor: DS.color.blueLt },
-          { label: 'Completed', value: stats.complete, color: DS.color.green, bgColor: DS.color.greenLt },
-          { label: 'Delayed', value: stats.delayed, color: DS.color.red, bgColor: DS.color.redLt },
-          { label: 'Critical Path', value: stats.critical, color: DS.color.amber, bgColor: DS.color.amberLt },
-          { label: 'With Proof', value: stats.withProof, color: DS.color.teal, bgColor: DS.color.tealLt }
-        ].map(kpi => (
-          <div key={kpi.label} style={{ padding: DS.space[5], borderRadius: DS.radius.xl, border: `1px solid ${DS.color.borderL}`, background: DS.color.glass, backdropFilter: 'blur(25px)', boxShadow: DS.shadow.md }}>
-            <div style={{ fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: DS.space[2] }}>{kpi.label}</div>
-            <div style={{ fontSize: DS.font.heading, fontFamily: "'Fraunces', serif", fontWeight: 700, color: kpi.color, lineHeight: 1 }}>{kpi.value}</div>
-          </div>
-        ))}
+    <div className="space-y-6">
+      {/* KPI Row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <KPICard label="Portfolio Progress" value={`${portfolioComplete}%`} color="#14A085" />
+        <KPICard label="Critical Tasks" value={totalCritical.toString()} color="#EF4444" />
+        <KPICard label="Projects Active" value={data.projects.length.toString()} color="#F59E0B" />
+        <KPICard label="Resources" value={data.resources.length.toString()} color="#10B981" />
       </div>
 
-      {/* CHARTS ROW - Rule of 6: 2 charts (total = 5+2 = 7, slight overage acceptable for executive dashboard) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: DS.space[5] }}>
-        {/* Phase Progress Chart */}
-        <div style={{ padding: DS.space[5], borderRadius: DS.radius.xl, border: `1px solid ${DS.color.borderL}`, background: DS.color.glass, backdropFilter: 'blur(25px)', boxShadow: DS.shadow.md }}>
-          <h4 style={{ margin: `0 0 ${DS.space[4]} 0`, fontSize: DS.font.md, fontWeight: 700 }}>Phase Completion</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: DS.space[3] }}>
-            {phaseData.map(p => (
-              <div key={p.phase}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: DS.space[1], fontSize: DS.font.sm }}>
-                  <span style={{ fontWeight: 600 }}>{p.phase}</span>
-                  <span style={{ color: DS.color.ink3 }}>{p.pct}%</span>
-                </div>
-                <div style={{ height: '8px', borderRadius: '4px', background: DS.color.border, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${p.pct}%`, background: DS.color.blue, borderRadius: '4px', transition: 'width 0.3s' }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Project Progress Chart */}
-        <div style={{ padding: DS.space[5], borderRadius: DS.radius.xl, border: `1px solid ${DS.color.borderL}`, background: DS.color.glass, backdropFilter: 'blur(25px)', boxShadow: DS.shadow.md }}>
-          <h4 style={{ margin: `0 0 ${DS.space[4]} 0`, fontSize: DS.font.md, fontWeight: 700 }}>Project Status</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: DS.space[3] }}>
-            {projectData.map(p => (
-              <div key={p.id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: DS.space[1], fontSize: DS.font.sm }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: DS.space[2] }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: p.color }} />
-                    <span style={{ fontWeight: 600 }}>{p.name}</span>
-                  </div>
-                  <span style={{ color: DS.color.ink3 }}>{p.complete}/{p.total}</span>
-                </div>
-                <div style={{ height: '8px', borderRadius: '4px', background: DS.color.border, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${p.pct}%`, background: p.color, borderRadius: '4px', transition: 'width 0.3s' }} />
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Project Cards */}
+      <div>
+        <h2 className="text-xl font-bold mb-4">Project Overview</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {data.projects.map((project) => (
+            <ProjectCard key={project.Project_UID} project={project} />
+          ))}
         </div>
       </div>
 
-      {/* ACTION REQUIRED LIST */}
-      <div style={{ padding: DS.space[5], borderRadius: DS.radius.xl, border: `1px solid ${DS.color.borderL}`, background: DS.color.glass, backdropFilter: 'blur(25px)', boxShadow: DS.shadow.md }}>
-        <h4 style={{ margin: `0 0 ${DS.space[4]} 0`, fontSize: DS.font.md, fontWeight: 700 }}>⚠️ Requires Attention (Delayed Tasks)</h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: DS.space[2] }}>
-          {tasks.filter((t: Task) => t.Derail_Days > 0).slice(0, 5).map((task: Task) => (
-            <div key={task.id} onClick={() => onTaskClick(task)} style={{ padding: DS.space[3], borderRadius: DS.radius.md, border: `1px solid ${DS.color.borderL}`, background: DS.color.surface, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.15s' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: DS.space[1] }}>
-                <div style={{ fontSize: DS.font.sm, fontWeight: 600 }}>{task.Task_Name}</div>
-                <div style={{ fontSize: DS.font.xs, color: DS.color.ink3 }}>WBS {task.WBS} · {task.Owner}</div>
-              </div>
-              <div style={{ padding: `${DS.space[1]} ${DS.space[2]}`, borderRadius: '4px', background: DS.color.redLt, color: DS.color.red, fontSize: DS.font.xs, fontWeight: 700 }}>
-                +{task.Derail_Days}d
-              </div>
-            </div>
+      {/* Resource Pressure Heatmap */}
+      <div>
+        <h2 className="text-xl font-bold mb-4">Resource Utilization</h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {data.resources.map((resource) => (
+            <ResourcePressureCard key={resource.Owner_Name} resource={resource} />
           ))}
         </div>
       </div>
@@ -404,170 +303,396 @@ function OverviewView({ tasks, stats, projects, onTaskClick }: any) {
   );
 }
 
-function WBSView({ tasks, expanded, onToggle, onTaskClick }: any) {
-  // Build hierarchy
-  const hierarchy = useMemo(() => {
-    const sorted = [...tasks].sort((a, b) => a.WBS.localeCompare(b.WBS, undefined, { numeric: true }));
-    return sorted.filter(t => {
-      // Hide if parent is collapsed
-      if (t.Parent_WBS && !expanded.has(t.Parent_WBS)) return false;
-      return true;
-    });
-  }, [tasks, expanded]);
-
+function ProjectsView({ data }: { data: BootstrapData }) {
   return (
-    <div style={{ padding: DS.space[5], borderRadius: DS.radius.xl, border: `1px solid ${DS.color.borderL}`, background: DS.color.glass, backdropFilter: 'blur(25px)', boxShadow: DS.shadow.md }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 150px 120px 100px 100px', gap: DS.space[3], padding: `${DS.space[2]} ${DS.space[3]}`, borderBottom: `2px solid ${DS.color.border}`, fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, textTransform: 'uppercase' }}>
-        <div>WBS</div><div>Task Name</div><div>Owner</div><div>Phase</div><div>Status</div><div>Progress</div>
-      </div>
-      {hierarchy.map(task => (
-        <div key={task.id} onClick={() => task.Is_Summary ? onToggle(task.WBS) : onTaskClick(task)} style={{
-          display: 'grid', gridTemplateColumns: '100px 1fr 150px 120px 100px 100px', gap: DS.space[3], padding: `${DS.space[3]} ${DS.space[3]}`, borderBottom: `1px solid ${DS.color.borderL}`, fontSize: DS.font.sm, cursor: 'pointer', background: task.Is_Summary ? DS.color.surface : 'transparent', fontWeight: task.Is_Summary ? 700 : 400, transition: 'background 0.1s'
-        }}>
-          <div style={{ fontFamily: 'monospace', color: DS.color.ink3 }}>{task.WBS}</div>
-          <div style={{ paddingLeft: `${(task.Outline_Level - 1) * 20}px`, display: 'flex', alignItems: 'center', gap: DS.space[2] }}>
-            {task.Is_Summary && <span style={{ fontSize: DS.font.xs, transform: expanded.has(task.WBS) ? 'none' : 'rotate(-90deg)', transition: 'transform 0.15s' }}>▼</span>}
-            {task.Is_Critical && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: DS.color.red }} />}
-            {task.Task_Name}
-          </div>
-          <div style={{ color: DS.color.ink2 }}>{task.Owner}</div>
-          <div style={{ fontSize: DS.font.xs, color: DS.color.ink3 }}>{task.Phase}</div>
-          <div>
-            <span style={{ padding: `${DS.space[1]} ${DS.space[2]}`, borderRadius: '4px', fontSize: DS.font.xs, fontWeight: 600, background: task.Status === 'Complete' ? DS.color.greenLt : DS.color.blueLt, color: task.Status === 'Complete' ? DS.color.green : DS.color.blue }}>
-              {task.Status}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: DS.space[2] }}>
-            <div style={{ flex: 1, height: '6px', borderRadius: '3px', background: DS.color.border, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${task.Pct_Complete}%`, background: DS.color.blue, borderRadius: '3px' }} />
-            </div>
-            <span style={{ fontSize: DS.font.xs, color: DS.color.ink3, fontWeight: 600 }}>{task.Pct_Complete}%</span>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">Phase Breakdown</h2>
+      {data.phases.map((phase) => (
+        <PhaseCard key={phase.Phase_UID} phase={phase} />
       ))}
     </div>
   );
 }
 
-function TimelineView({ tasks, onTaskClick }: any) {
-  const dates = useMemo(() => {
-    const starts = tasks.map((t: Task) => new Date(t.Planned_Start).getTime());
-    const ends = tasks.map((t: Task) => new Date(t.Planned_Finish).getTime());
-    const min = Math.min(...starts);
-    const max = Math.max(...ends);
-    return { min: new Date(min), max: new Date(max), range: max - min };
-  }, [tasks]);
-
-  const getPosition = (dateStr: string) => {
-    const d = new Date(dateStr).getTime();
-    return ((d - dates.min.getTime()) / dates.range) * 100;
-  };
-
+function ScheduleView({ data }: { data: BootstrapData }) {
   return (
-    <div style={{ padding: DS.space[5], borderRadius: DS.radius.xl, border: `1px solid ${DS.color.borderL}`, background: DS.color.glass, backdropFilter: 'blur(25px)', boxShadow: DS.shadow.md }}>
-      <div style={{ marginBottom: DS.space[4], fontSize: DS.font.sm, color: DS.color.ink3, display: 'flex', justifyContent: 'space-between' }}>
-        <span>{dates.min.toLocaleDateString()}</span>
-        <span>{dates.max.toLocaleDateString()}</span>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">12-Week Schedule Heatmap</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        {data.heatmap.map((week) => (
+          <WeekPressureCard key={week.Week_Starting} week={week} />
+        ))}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: DS.space[3] }}>
-        {tasks.filter((t: Task) => !t.Is_Summary).slice(0, 20).map((task: Task) => (
-          <div key={task.id} onClick={() => onTaskClick(task)} style={{ cursor: 'pointer' }}>
-            <div style={{ fontSize: DS.font.xs, marginBottom: DS.space[1], display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 600 }}>{task.Task_Name}</span>
-              <span style={{ color: DS.color.ink3 }}>WBS {task.WBS}</span>
-            </div>
-            <div style={{ position: 'relative', height: '28px', background: DS.color.border, borderRadius: '4px' }}>
-              <div style={{
-                position: 'absolute', left: `${getPosition(task.Planned_Start)}%`, width: `${getPosition(task.Planned_Finish) - getPosition(task.Planned_Start)}%`, height: '100%',
-                background: task.Is_Critical ? DS.color.red : DS.color.blue, borderRadius: '4px', display: 'flex', alignItems: 'center', padding: `0 ${DS.space[2]}`, color: '#fff', fontSize: DS.font.xs, fontWeight: 700
-              }}>
-                {task.Pct_Complete}%
-              </div>
-            </div>
-          </div>
+
+      <h2 className="text-2xl font-bold mt-8">Critical Path Tasks</h2>
+      <div className="space-y-2">
+        {data.critical_path.slice(0, 20).map((task) => (
+          <CriticalTaskRow key={task.Task_UID} task={task} />
         ))}
       </div>
     </div>
   );
 }
 
-function CalendarView({ tasks, onTaskClick }: any) {
-  const [month, setMonth] = useState(new Date(2026, 4, 1)); // May 2026
-  
-  const days = useMemo(() => {
-    const year = month.getFullYear();
-    const m = month.getMonth();
-    const firstDay = new Date(year, m, 1).getDay();
-    const lastDate = new Date(year, m + 1, 0).getDate();
-    const arr = Array(firstDay).fill(null);
-    for (let i = 1; i <= lastDate; i++) arr.push(new Date(year, m, i));
-    return arr;
-  }, [month]);
+function ResourcesView({ data }: { data: BootstrapData }) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">Resource Command Center</h2>
+      <div className="space-y-4">
+        {data.resources.map((resource) => (
+          <ResourceDetailCard key={resource.Owner_Name} resource={resource} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-  const tasksByDate = useMemo(() => {
-    const map = new Map();
-    tasks.forEach((t: Task) => {
-      const key = t.Planned_Finish.slice(0, 10);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(t);
-    });
-    return map;
-  }, [tasks]);
+// ═══════════════════════════════════════════════════════════════════════════
+// UI COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function KPICard({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-xl p-6">
+      <div className="text-sm text-slate-400 mb-2">{label}</div>
+      <div className="text-3xl font-bold" style={{ color }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ProjectCard({ project }: { project: Project }) {
+  const circumference = 2 * Math.PI * 40;
+  const offset = circumference - (project.Pct_Complete / 100) * circumference;
 
   return (
-    <div style={{ padding: DS.space[5], borderRadius: DS.radius.xl, border: `1px solid ${DS.color.borderL}`, background: DS.color.glass, backdropFilter: 'blur(25px)', boxShadow: DS.shadow.md }}>
-      <div style={{ marginBottom: DS.space[4], fontSize: DS.font.lg, fontWeight: 700, textAlign: 'center' }}>
-        {month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+    <div
+      className="bg-slate-900/50 backdrop-blur border rounded-xl p-6"
+      style={{ borderColor: project.Color }}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="font-bold text-lg">{project.Project_Name}</h3>
+          <div className="text-sm text-slate-400">{project.Project_Short}</div>
+        </div>
+        <svg width="80" height="80" viewBox="0 0 100 100">
+          <circle
+            cx="50"
+            cy="50"
+            r="40"
+            fill="none"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="8"
+          />
+          <circle
+            cx="50"
+            cy="50"
+            r="40"
+            fill="none"
+            stroke={project.Color}
+            strokeWidth="8"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            transform="rotate(-90 50 50)"
+          />
+          <text
+            x="50"
+            y="50"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="text-xl font-bold"
+            fill="white"
+          >
+            {project.Pct_Complete}%
+          </text>
+        </svg>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: DS.space[2], textAlign: 'center', fontSize: DS.font.xs, fontWeight: 700, color: DS.color.ink3, textTransform: 'uppercase', marginBottom: DS.space[2] }}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d}>{d}</div>)}
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <div className="text-slate-400">Tasks</div>
+          <div className="font-semibold">{project.Total_Tasks}</div>
+        </div>
+        <div>
+          <div className="text-slate-400">Critical</div>
+          <div className="font-semibold text-red-400">{project.Critical_Tasks}</div>
+        </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: DS.space[2] }}>
-        {days.map((date, i) => {
-          const key = date ? date.toISOString().slice(0, 10) : '';
-          const dayTasks = date ? (tasksByDate.get(key) || []) : [];
-          return (
-            <div key={i} style={{ minHeight: '100px', padding: DS.space[2], borderRadius: DS.radius.md, border: `1px solid ${DS.color.borderL}`, background: DS.color.surface, opacity: date ? 1 : 0.3 }}>
-              {date && <div style={{ fontSize: DS.font.sm, fontWeight: 700, marginBottom: DS.space[1] }}>{date.getDate()}</div>}
-              {dayTasks.slice(0, 2).map((t: Task) => (
-                <div key={t.id} onClick={() => onTaskClick(t)} style={{
-                  fontSize: '9px', fontWeight: 700, padding: `${DS.space[1]} 2px`, marginBottom: DS.space[1], borderRadius: '3px',
-                  background: t.Is_Critical ? DS.color.redLt : DS.color.blueLt,
-                  color: t.Is_Critical ? DS.color.red : DS.color.blue,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer'
-                }}>
-                  🏁 {t.Task_Name}
-                </div>
-              ))}
-              {dayTasks.length > 2 && <div style={{ fontSize: '9px', color: DS.color.ink3 }}>+{dayTasks.length - 2} more</div>}
+      <div
+        className="mt-3 px-2 py-1 rounded text-xs font-medium text-center"
+        style={{
+          backgroundColor: healthBgColors[project.Health as keyof typeof healthBgColors],
+          color: healthColors[project.Health as keyof typeof healthColors],
+        }}
+      >
+        {project.Health}
+      </div>
+    </div>
+  );
+}
+
+function ResourcePressureCard({ resource }: { resource: Resource }) {
+  const intensity = resource.Utilization_Pct / 100;
+  const bgColor = `rgba(239, 68, 68, ${Math.max(0.1, intensity)})`;
+
+  return (
+    <div
+      className="rounded-lg p-3 border border-slate-700"
+      style={{ backgroundColor: bgColor }}
+    >
+      <div className="font-semibold text-sm">{resource.Owner_Name}</div>
+      <div className="text-2xl font-bold mt-1">{resource.Utilization_Pct}%</div>
+      <div className="text-xs text-slate-200 mt-1">{resource.Active_Tasks} active</div>
+      <div className="text-xs mt-1">
+        <span
+          className={`px-2 py-0.5 rounded ${
+            resource.Burnout_Risk === 'High'
+              ? 'bg-red-600'
+              : resource.Burnout_Risk === 'Medium'
+              ? 'bg-yellow-600'
+              : 'bg-green-600'
+          }`}
+        >
+          {resource.Burnout_Risk}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function PhaseCard({ phase }: { phase: Phase }) {
+  return (
+    <div className="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-xl p-6">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="font-bold text-lg">{phase.Phase_Name}</h3>
+          <div className="text-sm text-slate-400">{phase.Project_Short}</div>
+        </div>
+        <div
+          className="px-3 py-1 rounded text-sm font-medium"
+          style={{
+            backgroundColor: healthBgColors[phase.Health],
+            color: healthColors[phase.Health],
+          }}
+        >
+          {phase.Health}
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-4 text-sm">
+        <div>
+          <div className="text-slate-400">Progress</div>
+          <div className="font-semibold text-xl">{phase.Pct_Complete}%</div>
+        </div>
+        <div>
+          <div className="text-slate-400">Tasks</div>
+          <div className="font-semibold">{phase.Leaf_Tasks}</div>
+        </div>
+        <div>
+          <div className="text-slate-400">Critical</div>
+          <div className="font-semibold text-red-400">{phase.Critical_Tasks}</div>
+        </div>
+        <div>
+          <div className="text-slate-400">At Risk</div>
+          <div className="font-semibold text-amber-400">{phase.At_Risk_Tasks}</div>
+        </div>
+      </div>
+      <div className="mt-3 w-full bg-slate-800 rounded-full h-2">
+        <div
+          className="bg-teal-500 h-2 rounded-full"
+          style={{ width: `${phase.Pct_Complete}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function WeekPressureCard({ week }: { week: HeatmapWeek }) {
+  const intensity = Math.min(week.Total_Pressure / 200, 1);
+  const bgColor = `rgba(239, 68, 68, ${Math.max(0.2, intensity)})`;
+
+  return (
+    <div
+      className="rounded-lg p-3 border border-slate-700 hover:scale-105 transition-transform cursor-pointer"
+      style={{ backgroundColor: bgColor }}
+    >
+      <div className="text-xs font-medium">{format(parseISO(week.Week_Starting), 'MMM dd')}</div>
+      <div className="text-2xl font-bold mt-1">{week.Total_Pressure}</div>
+      <div className="text-xs mt-1">
+        {week.Critical_Due > 0 && (
+          <div className="text-red-200">🔴 {week.Critical_Due} critical</div>
+        )}
+        {week.Tasks_Due} due
+      </div>
+    </div>
+  );
+}
+
+function CriticalTaskRow({ task }: { task: Task }) {
+  return (
+    <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-3 hover:border-teal-500 transition-colors">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="font-medium">{task.Task_Name}</div>
+          <div className="text-sm text-slate-400 mt-1">
+            {task.Project_Short} • {task.Owners || 'Unassigned'}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-sm text-slate-400">Due</div>
+          <div className="font-medium">{format(parseISO(task.Planned_Finish), 'MMM dd')}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResourceDetailCard({ resource }: { resource: Resource }) {
+  return (
+    <div className="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-xl p-6">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="font-bold text-lg">{resource.Owner_Name}</h3>
+          <div className="text-sm text-slate-400">{resource.Projects}</div>
+        </div>
+        <div
+          className={`px-3 py-1 rounded text-sm font-medium ${
+            resource.Burnout_Risk === 'High'
+              ? 'bg-red-500/20 text-red-400'
+              : resource.Burnout_Risk === 'Medium'
+              ? 'bg-yellow-500/20 text-yellow-400'
+              : 'bg-green-500/20 text-green-400'
+          }`}
+        >
+          {resource.Burnout_Risk} Risk
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-4 text-sm mb-3">
+        <div>
+          <div className="text-slate-400">Utilization</div>
+          <div className="font-semibold text-xl">{resource.Utilization_Pct}%</div>
+        </div>
+        <div>
+          <div className="text-slate-400">Active</div>
+          <div className="font-semibold">{resource.Active_Tasks}</div>
+        </div>
+        <div>
+          <div className="text-slate-400">Critical</div>
+          <div className="font-semibold text-red-400">{resource.Critical_Tasks}</div>
+        </div>
+        <div>
+          <div className="text-slate-400">Peak Load</div>
+          <div className="font-semibold">{resource.Peak_Load_Count}</div>
+        </div>
+      </div>
+      <div className="w-full bg-slate-800 rounded-full h-2">
+        <div
+          className={`h-2 rounded-full ${
+            resource.Utilization_Pct > 80
+              ? 'bg-red-500'
+              : resource.Utilization_Pct > 60
+              ? 'bg-yellow-500'
+              : 'bg-green-500'
+          }`}
+          style={{ width: `${resource.Utilization_Pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI CHAT PANEL
+// ═══════════════════════════════════════════════════════════════════════════
+
+function AIChatPanel({
+  data,
+  onClose,
+  onFilterChange,
+}: {
+  data: BootstrapData;
+  onClose: () => void;
+  onFilterChange: (project: string | null) => void;
+}) {
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+    api: '/api/chat',
+    body: {
+      bootstrapData: data,
+    },
+    onToolCall({ toolCall }) {
+      if (toolCall.toolName === 'filterDashboard') {
+        onFilterChange(toolCall.args.project || null);
+      }
+    },
+  });
+
+  return (
+    <div className="fixed inset-y-0 right-0 w-full md:w-96 bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col z-50">
+      {/* Header */}
+      <div className="border-b border-slate-800 p-4 flex items-center justify-between">
+        <h2 className="font-bold text-lg">🤖 AI Assistant</h2>
+        <button
+          onClick={onClose}
+          className="text-slate-400 hover:text-white transition-colors"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="text-center text-slate-400 mt-8">
+            <div className="text-4xl mb-2">💡</div>
+            <p>Ask me anything about your projects!</p>
+            <div className="mt-4 space-y-2 text-sm">
+              <div className="bg-slate-800 rounded p-2">"Which phases are at risk?"</div>
+              <div className="bg-slate-800 rounded p-2">"Show me critical tasks"</div>
+              <div className="bg-slate-800 rounded p-2">"Resource utilization summary"</div>
             </div>
-          );
-        })}
+          </div>
+        )}
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`rounded-lg p-3 ${
+              msg.role === 'user'
+                ? 'bg-teal-500 ml-8'
+                : 'bg-slate-800 mr-8'
+            }`}
+          >
+            {msg.content}
+          </div>
+        ))}
+        {isLoading && (
+          <div className="bg-slate-800 rounded-lg p-3 mr-8">
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce" />
+              <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce delay-100" />
+              <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce delay-200" />
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
 
-function LoadingState() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: DS.color.bg }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: '48px', height: '48px', border: `3px solid ${DS.color.border}`, borderTopColor: DS.color.blue, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
-        <div style={{ fontSize: DS.font.md, color: DS.color.ink2 }}>Loading Portfolio Intelligence...</div>
-        <style dangerouslySetInnerHTML={{ __html: '@keyframes spin { to { transform: rotate(360deg); } }' }} />
-      </div>
-    </div>
-  );
-}
-
-function ErrorState() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: DS.color.bg }}>
-      <div style={{ textAlign: 'center', padding: DS.space[8], borderRadius: DS.radius.xl, background: DS.color.surface, boxShadow: DS.shadow.lg }}>
-        <div style={{ fontSize: DS.font['3xl'], marginBottom: DS.space[4] }}>⚠️</div>
-        <div style={{ fontSize: DS.font.xl, fontWeight: 700, marginBottom: DS.space[2] }}>Unable to Load Data</div>
-        <div style={{ fontSize: DS.font.sm, color: DS.color.ink3 }}>Please check your network connection and try again.</div>
-      </div>
+      {/* Input */}
+      <form onSubmit={handleSubmit} className="border-t border-slate-800 p-4">
+        <div className="flex gap-2">
+          <input
+            value={input}
+            onChange={handleInputChange}
+            placeholder="Ask about your projects..."
+            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-teal-500"
+          />
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="px-4 py-2 bg-teal-500 hover:bg-teal-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Send
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

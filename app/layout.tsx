@@ -1,23 +1,19 @@
-export const metadata = {
-  title: 'Iconic Project Tracker',
-  description: 'Construction Portfolio Management Platform',
-}
+import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Iconic Project Tracker | Acres Foundation',
+  description: 'Enterprise construction project intelligence platform',
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fraunces:wght@300;400;700&display=swap" rel="stylesheet" />
-      </head>
-      <body style={{ margin: 0, fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif", backgroundColor: '#F4F3EF', fontSize: '13px', color: '#1A1814' }}>
-        {children}
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
-  )
+  );
 }
